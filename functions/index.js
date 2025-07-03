@@ -5,7 +5,7 @@ import express from "express";
 import cors from "cors";
 import crypto from "crypto";
 import fs from "fs";
-import functions from 'firebase-functions';
+import functions from "firebase-functions";
 
 const config = functions.config().adminsdk;
 
@@ -13,7 +13,7 @@ const serviceAccount = {
   type: config.type,
   project_id: config.project_id,
   private_key_id: config.private_key_id,
-  private_key: config.private_key.replace(/\\n/g, '\n'),
+  private_key: config.private_key.replace(/\\n/g, "\n"),
   client_email: config.client_email,
   client_id: config.client_id,
   auth_uri: config.auth_uri,
@@ -64,6 +64,7 @@ async function addApi(akey, name, url, uid) {
       url: url,
       apiKey: akey,
       uid: uid,
+      status: "active",
       time: admin.firestore.FieldValue.serverTimestamp(),
     });
 
@@ -123,14 +124,41 @@ async function compaignsDatas(uid) {
   }
 }
 
+async function authenticate(req, res, next) {
+  const authHeader = req.headers.authorization || "";
+  const idToken = authHeader.split("Bearer ")[1];
+  if (!idToken) {
+    return res.status(401).json({ error: "Unauthorized: No token provided" });
+  }
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    req.uid = decodedToken.uid; // Securely verified UID
+    next();
+  } catch (error) {
+    return res
+      .status(401)
+      .json({ error: "Unauthorized", details: error.message });
+  }
+}
+
+async function getAllLeads(userRef) {
+  const leadsCol = userRef.collection("leads");
+  const snapshot = await leadsCol.count().get();
+  const total = snapshot.data().count;
+  console.log(`Total leads for user: ${total}`);
+  return total;
+}
+
 app.get("/", (req, res) => {
   res.send("working");
 });
 
 // Endpoint: Create a test document
-app.post("/create-db", async (req, res) => {
+app.post("/create-db", authenticate, async (req, res) => {
   try {
-    const { uid, name, email } = req.body;
+    const { name, email } = req.body;
+    const uid = req.uid;
+
     if (!uid) {
       return res.status(400).json({ error: "UID is required" });
     }
@@ -165,10 +193,15 @@ app.post("/create-db", async (req, res) => {
 });
 
 // Endpoint: Fetch users/leads
-app.get("/users", async (req, res) => {
+app.get("/users", authenticate, async (req, res) => {
   try {
-    const { uid, date, endDate, campaignId, status } = req.query;
-
+    if (req.query.error === "true") {
+      return res
+        .status(500)
+        .json({ message: "Simulated internal server error" });
+    }
+    const { date, endDate, campaignId, status } = req.query;
+    const uid = req.uid;
     if (!uid)
       return res.status(400).json({ error: "User ID (uid) is required" });
 
@@ -232,7 +265,9 @@ app.get("/users", async (req, res) => {
       ...doc.data(),
     }));
 
-    return res.json({ count: leads.length, leads });
+    const leadLength = await getAllLeads(userRef);
+
+    return res.json({ count: leadLength, leads });
   } catch (error) {
     console.error("Error fetching leads:", error);
     res
@@ -280,10 +315,15 @@ app.post("/users/add", async (req, res) => {
 });
 
 // Endpoint: Generate API key
-app.post("/generate-key", async (req, res) => {
+app.post("/generate-key", authenticate, async (req, res) => {
   try {
-    const { name, url, uid } = req.body;
-    if (!name || !url || !uid) {
+    const { name, url } = req.body;
+
+    const uid = req.uid;
+
+    console.log(uid, "uid");
+
+    if (!name || !url) {
       return res
         .status(400)
         .json({ error: "All fields (name, url, uid) are required" });
@@ -306,9 +346,10 @@ app.post("/generate-key", async (req, res) => {
 });
 
 // Endpoint: Fetch campaigns data
-app.get("/compaigns/datas", async (req, res) => {
+app.get("/compaigns/datas", authenticate, async (req, res) => {
   try {
-    const { uid } = req.query;
+    const uid = req.uid;
+
     if (!uid) {
       return res.status(400).json({ error: "UID is required" });
     }
@@ -361,9 +402,9 @@ app.get("/compaigns/datas", async (req, res) => {
   }
 });
 
-app.get("/user/lables", async (req, res) => {
+app.get("/user/lables", authenticate, async (req, res) => {
   try {
-    const { uid } = req.query;
+    const uid = req.uid;
 
     if (!uid) {
       return res.status(400).json({ error: "UID is required" });
@@ -540,9 +581,9 @@ app.post("/user/createMembers", async (req, res) => {
   }
 });
 
-app.get("/user/memberLists", async (req, res) => {
+app.get("/user/memberLists", authenticate, async (req, res) => {
   try {
-    const { uid } = req.query;
+    const uid = req.uid;
 
     if (!uid) {
       return res.status(400).json({ message: "Missing required UID." });
