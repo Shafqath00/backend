@@ -3,7 +3,11 @@
     {
       "source": "functions",
       "codebase": "default",
-      "ignore": [
+      "runtime": "nodejs22",            
+      "timeoutSeconds": 300,           
+      "memory": "512MiB",              
+      "region": ["europe-west1"],
+        "ignore": [
         "node_modules",
         ".git",
         "firebase-debug.log",

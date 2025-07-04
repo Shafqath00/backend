@@ -9,24 +9,26 @@ import functions from "firebase-functions";
 
 const config = functions.config().adminsdk;
 
-const serviceAccount = {
-  type: config.type,
-  project_id: config.project_id,
-  private_key_id: config.private_key_id,
-  private_key: config.private_key.replace(/\\n/g, "\n"),
-  client_email: config.client_email,
-  client_id: config.client_id,
-  auth_uri: config.auth_uri,
-  token_uri: config.token_uri,
-  auth_provider_x509_cert_url: config.auth_provider_x509_cert_url,
-  client_x509_cert_url: config.client_x509_cert_url,
-  universe_domain: config.universe_domain,
-};
+// const serviceAccount = {
+//   type: config.type,
+//   project_id: config.project_id,
+//   private_key_id: config.private_key_id,
+//   private_key: config.private_key.replace(/\\n/g, "\n"),
+//   client_email: config.client_email,
+//   client_id: config.client_id,
+//   auth_uri: config.auth_uri,
+//   token_uri: config.token_uri,
+//   auth_provider_x509_cert_url: config.auth_provider_x509_cert_url,
+//   client_x509_cert_url: config.client_x509_cert_url,
+//   universe_domain: config.universe_domain,
+// };
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+// admin.initializeApp({
+//   credential: admin.credential.cert(serviceAccount),
+// });
 
+admin.initializeApp()
+// admin.initializeApp();
 const db = admin.firestore();
 const app = express();
 
@@ -75,7 +77,7 @@ async function addApi(akey, name, url, uid) {
       }),
     });
 
-    console.log("API key added successfully");
+    // console.log("API key added successfully");
 
     // Return success message and compay reference
     return {
@@ -145,7 +147,7 @@ async function getAllLeads(userRef) {
   const leadsCol = userRef.collection("leads");
   const snapshot = await leadsCol.count().get();
   const total = snapshot.data().count;
-  console.log(`Total leads for user: ${total}`);
+  // console.log(`Total leads for user: ${total}`);
   return total;
 }
 
@@ -176,7 +178,7 @@ app.post("/create-db", authenticate, async (req, res) => {
         createdAtt: admin.firestore.FieldValue.serverTimestamp(),
         // Add any default fields you want for new users
       });
-      console.log(`Created new user document for uid: ${uid}`);
+      // console.log(`Created new user document for uid: ${uid}`);
     }
 
     // await userRef.set(data);
@@ -210,7 +212,7 @@ app.get("/users", authenticate, async (req, res) => {
 
     if (!userDoc.exists) {
       await userRef.set({ createdAt: new Date() });
-      console.log(`Created new user document for uid: ${uid}`);
+      // console.log(`Created new user document for uid: ${uid}`);
     }
 
     const userData = userDoc.data();
@@ -222,7 +224,7 @@ app.get("/users", authenticate, async (req, res) => {
 
     // Date filter
     if (date && endDate) {
-      console.log(endDate, date);
+      // console.log(endDate, date);
       query = query.where("date", ">=", date).where("date", "<=", endDate);
     } else if (date) {
       query = query.where("date", "==", date);
@@ -321,7 +323,7 @@ app.post("/generate-key", authenticate, async (req, res) => {
 
     const uid = req.uid;
 
-    console.log(uid, "uid");
+  //  console.log (uid, "uid");
 
     if (!name || !url) {
       return res
@@ -372,7 +374,7 @@ app.get("/compaigns/datas", authenticate, async (req, res) => {
         return res.status(200).json({ data: [] });
       }
 
-      // Fetch each allowed campaign document
+      // Fetch each all/owed campaign document
       const campaignDocs = await Promise.all(
         allowedCampaignIds.map((id) => db.collection("companys").doc(id).get())
       );
@@ -402,6 +404,19 @@ app.get("/compaigns/datas", authenticate, async (req, res) => {
   }
 });
 
+app.delete("/campaign/:campaignId", async (req, res) => {
+  const { campaignId } = req.params
+  if (!campaignId) {
+    return res.status(400).json({ message: "Missing campaignId" })
+  }
+  try {
+    await db.collection("companys").doc(campaignId).delete()
+    return res.status(200).json({ message: "Deleted" })
+  } catch (e) {
+    console.error(e)
+    return res.status(500).json({ message: "Server error" })
+  }
+})
 app.get("/user/lables", authenticate, async (req, res) => {
   try {
     const uid = req.uid;
@@ -540,7 +555,7 @@ app.post("/user/createMembers", async (req, res) => {
     }
 
     const memberUid = userRecord.uid;
-    console.log(`New Firebase Auth user created: ${memberUid}`);
+    // console.log(`New Firebase Auth user created: ${memberUid}`);
 
     // Create main user document if not exists
     const userRef = db.collection("user").doc(memberUid);
@@ -557,7 +572,7 @@ app.post("/user/createMembers", async (req, res) => {
         role: "member",
         createdAtt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      console.log(`Created new user document for uid: ${memberUid}`);
+      // console.log(`Created new user document for uid: ${memberUid}`);
     }
 
     // Add to admin's teamMembers subcollection
@@ -690,4 +705,10 @@ app.get("/user/memberLists", authenticate, async (req, res) => {
 // });
 
 // Export as Firebase Function
-export const back = onRequest({ region: "us-central1" }, app);
+// export const backed = onRequest({ region: "us-central1" }, app);
+
+
+export const backed = onRequest(
+  { region: "europe-west1", memory: "512MiB", cpu: 2 },
+  app
+);
